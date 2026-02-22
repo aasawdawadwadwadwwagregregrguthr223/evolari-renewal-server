@@ -4,14 +4,23 @@ const app = express();
 app.use(express.json());
 
 const SHOPIFY_STORE = 'evolari.myshopify.com';
-const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
+const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
 const EVOLARI_SYNC_VARIANT_ID = 52855103750449;
 const PORT = process.env.PORT || 3000;
+
+function getAuthHeader() {
+  const credentials = Buffer.from(`${SHOPIFY_API_KEY}:${SHOPIFY_API_SECRET}`).toString('base64');
+  return `Basic ${credentials}`;
+}
 
 async function createRenewalOrder(customerId, customerEmail) {
   const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json`, {
     method: 'POST',
-    headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': getAuthHeader(),
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({
       order: {
         customer: { id: customerId },
@@ -30,7 +39,7 @@ async function createRenewalOrder(customerId, customerEmail) {
 async function getSubscriptionOrders() {
   const url = `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&status=any&limit=250`;
   const res = await fetch(url, {
-    headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
+    headers: { 'Authorization': getAuthHeader() }
   });
   const data = await res.json();
   console.log('[DEBUG] Orders response:', JSON.stringify(data));
@@ -42,12 +51,12 @@ app.get('/', (req, res) => {
 });
 
 app.get('/test-renew', async (req, res) => {
-  console.log('[TEST] Triggered. Token present:', !!SHOPIFY_TOKEN);
+  console.log('[TEST] Triggered. Keys present:', !!SHOPIFY_API_KEY, !!SHOPIFY_API_SECRET);
   try {
     const orders = await getSubscriptionOrders();
     res.json({
       success: true,
-      token_loaded: !!SHOPIFY_TOKEN,
+      keys_loaded: !!SHOPIFY_API_KEY && !!SHOPIFY_API_SECRET,
       variant_id: EVOLARI_SYNC_VARIANT_ID,
       subscription_orders_found: orders.length,
       orders: orders.map(o => ({
