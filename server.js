@@ -1,5 +1,6 @@
 const express = require('express');
 const cron = require('node-cron');
+const https = require('https');
 const app = express();
 app.use(express.json());
 
@@ -9,33 +10,48 @@ const SHOPIFY_STORE = 'evolari.myshopify.com';
 const EVOLARI_SYNC_VARIANT_ID = 52855103750449;
 const PORT = process.env.PORT || 3000;
 
-// Legacy Shopify auth: https://apikey:password@store.myshopify.com
-function shopifyUrl(path) {
-  return `https://${SHOPIFY_API_KEY}:${SHOPIFY_API_SECRET}@${SHOPIFY_STORE}/admin/api/2024-10${path}`;
+function shopifyRequest(method, path, body = null) {
+  return new Promise((resolve, reject) => {
+    const credentials = Buffer.from(`${SHOPIFY_API_KEY}:${SHOPIFY_API_SECRET}`).toString('base64');
+    const options = {
+      hostname: SHOPIFY_STORE,
+      path: `/admin/api/2024-10${path}`,
+      method,
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json'
+      }
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch(e) { reject(new Error('JSON parse error: ' + data)); }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
 }
 
 async function createRenewalOrder(customerId, customerEmail) {
-  const res = await fetch(shopifyUrl('/orders.json'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      order: {
-        customer: { id: customerId },
-        email: customerEmail,
-        line_items: [{ variant_id: EVOLARI_SYNC_VARIANT_ID, quantity: 1 }],
-        gateway: 'manual',
-        financial_status: 'pending',
-        tags: 'evolari-sync-renewal,auto-generated',
-        note: 'Auto-generated renewal order - Evolari Sync 30-day cycle'
-      }
-    })
+  return shopifyRequest('POST', '/orders.json', {
+    order: {
+      customer: { id: customerId },
+      email: customerEmail,
+      line_items: [{ variant_id: EVOLARI_SYNC_VARIANT_ID, quantity: 1 }],
+      gateway: 'manual',
+      financial_status: 'pending',
+      tags: 'evolari-sync-renewal,auto-generated',
+      note: 'Auto-generated renewal order - Evolari Sync 30-day cycle'
+    }
   });
-  return res.json();
 }
 
 async function getSubscriptionOrders() {
-  const res = await fetch(shopifyUrl('/orders.json?tag=evolari-subscription&status=any&limit=250'));
-  const data = await res.json();
+  const data = await shopifyRequest('GET', '/orders.json?tag=evolari-subscription&status=any&limit=250');
   console.log('[DEBUG] Orders response:', JSON.stringify(data).substring(0, 300));
   return data.orders || [];
 }
