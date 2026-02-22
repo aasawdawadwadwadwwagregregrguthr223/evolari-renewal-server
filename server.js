@@ -9,33 +9,29 @@ const EVOLARI_SYNC_VARIANT_ID = 52855103750449;
 const PORT = process.env.PORT || 3000;
 
 async function createRenewalOrder(customerId, customerEmail) {
-  const orderPayload = {
-    order: {
-      customer: { id: customerId },
-      email: customerEmail,
-      line_items: [{ variant_id: EVOLARI_SYNC_VARIANT_ID, quantity: 1 }],
-      gateway: 'manual',
-      financial_status: 'pending',
-      tags: 'evolari-sync-renewal,auto-generated',
-      note: 'Auto-generated renewal order - Evolari Sync 30-day cycle'
-    }
-  };
   const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json`, {
     method: 'POST',
     headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify(orderPayload)
+    body: JSON.stringify({
+      order: {
+        customer: { id: customerId },
+        email: customerEmail,
+        line_items: [{ variant_id: EVOLARI_SYNC_VARIANT_ID, quantity: 1 }],
+        gateway: 'manual',
+        financial_status: 'pending',
+        tags: 'evolari-sync-renewal,auto-generated',
+        note: 'Auto-generated renewal order - Evolari Sync 30-day cycle'
+      }
+    })
   });
   return res.json();
 }
 
 async function getSubscriptionOrders() {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const dateStr = thirtyDaysAgo.toISOString();
-  const res = await fetch(
-    `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`status=any`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`limit=250`,
-    { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
-  );
+  const url = `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&status=any&limit=250`;
+  const res = await fetch(url, {
+    headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
+  });
   const data = await res.json();
   console.log('[DEBUG] Orders response:', JSON.stringify(data));
   return data.orders || [];
