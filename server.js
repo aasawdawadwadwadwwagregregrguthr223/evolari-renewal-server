@@ -33,7 +33,7 @@ async function getSubscriptionOrders() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const dateStr = thirtyDaysAgo.toISOString();
   const res = await fetch(
-    `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`,
+    `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`status=any`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`limit=250`,
     { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
   );
   const data = await res.json();
