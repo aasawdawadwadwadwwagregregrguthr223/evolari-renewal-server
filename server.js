@@ -9,7 +9,7 @@ const EVOLARI_SYNC_PRODUCT_ID = '10351296577841';
 const PORT = process.env.PORT || 3000;
 
 async function getVariantId() {
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2026-01/products/${EVOLARI_SYNC_PRODUCT_ID}.json`, {
+  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-10/products/${EVOLARI_SYNC_PRODUCT_ID}.json`, {
     headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
   });
   const data = await res.json();
@@ -28,7 +28,7 @@ async function createRenewalOrder(customerId, customerEmail, variantId) {
       note: 'Auto-generated renewal order - Evolari Sync 30-day cycle'
     }
   };
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2026-01/orders.json`, {
+  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json`, {
     method: 'POST',
     headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' },
     body: JSON.stringify(orderPayload)
@@ -41,7 +41,7 @@ async function getSubscriptionOrders() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const dateStr = thirtyDaysAgo.toISOString();
   const res = await fetch(
-    `https://${SHOPIFY_STORE}/admin/api/2026-01/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`,
+    `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&created_at_min=${dateStr}&status=any&limit=250`,
     { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
   );
   const data = await res.json();
