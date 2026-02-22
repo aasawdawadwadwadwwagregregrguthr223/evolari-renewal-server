@@ -3,24 +3,21 @@ const cron = require('node-cron');
 const app = express();
 app.use(express.json());
 
-const SHOPIFY_STORE = 'evolari.myshopify.com';
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
+const SHOPIFY_STORE = 'evolari.myshopify.com';
 const EVOLARI_SYNC_VARIANT_ID = 52855103750449;
 const PORT = process.env.PORT || 3000;
 
-function getAuthHeader() {
-  const credentials = Buffer.from(`${SHOPIFY_API_KEY}:${SHOPIFY_API_SECRET}`).toString('base64');
-  return `Basic ${credentials}`;
+// Legacy Shopify auth: https://apikey:password@store.myshopify.com
+function shopifyUrl(path) {
+  return `https://${SHOPIFY_API_KEY}:${SHOPIFY_API_SECRET}@${SHOPIFY_STORE}/admin/api/2024-10${path}`;
 }
 
 async function createRenewalOrder(customerId, customerEmail) {
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json`, {
+  const res = await fetch(shopifyUrl('/orders.json'), {
     method: 'POST',
-    headers: {
-      'Authorization': getAuthHeader(),
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       order: {
         customer: { id: customerId },
@@ -37,12 +34,9 @@ async function createRenewalOrder(customerId, customerEmail) {
 }
 
 async function getSubscriptionOrders() {
-  const url = `https://${SHOPIFY_STORE}/admin/api/2024-10/orders.json?tag=evolari-subscription&status=any&limit=250`;
-  const res = await fetch(url, {
-    headers: { 'Authorization': getAuthHeader() }
-  });
+  const res = await fetch(shopifyUrl('/orders.json?tag=evolari-subscription&status=any&limit=250'));
   const data = await res.json();
-  console.log('[DEBUG] Orders response:', JSON.stringify(data));
+  console.log('[DEBUG] Orders response:', JSON.stringify(data).substring(0, 300));
   return data.orders || [];
 }
 
@@ -51,21 +45,17 @@ app.get('/', (req, res) => {
 });
 
 app.get('/test-renew', async (req, res) => {
-  console.log('[TEST] Triggered. Keys present:', !!SHOPIFY_API_KEY, !!SHOPIFY_API_SECRET);
+  console.log('[TEST] Triggered');
   try {
     const orders = await getSubscriptionOrders();
     res.json({
       success: true,
-      keys_loaded: !!SHOPIFY_API_KEY && !!SHOPIFY_API_SECRET,
-      variant_id: EVOLARI_SYNC_VARIANT_ID,
       subscription_orders_found: orders.length,
       orders: orders.map(o => ({
-        order_id: o.id,
         order_number: o.order_number,
         customer_email: o.email,
         customer_id: o.customer?.id,
-        tags: o.tags,
-        created_at: o.created_at
+        tags: o.tags
       }))
     });
   } catch (err) {
@@ -86,7 +76,7 @@ app.post('/renew', async (req, res) => {
       const result = await createRenewalOrder(customerId, customerEmail);
       if (result.order) {
         console.log(`[RENEWAL] ✓ #${result.order.order_number} for ${customerEmail}`);
-        results.push({ customer: customerEmail, orderId: result.order.id, orderNumber: result.order.order_number });
+        results.push({ customer: customerEmail, orderNumber: result.order.order_number });
       } else {
         console.log(`[RENEWAL] ✗ Failed:`, JSON.stringify(result.errors));
       }
