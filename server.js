@@ -1,4 +1,5 @@
 const express = require('express');
+const cron = require('node-cron');
 const app = express();
 app.use(express.json());
 
@@ -109,6 +110,39 @@ app.post('/renew', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({ status: 'Evolari Renewal Server running', time: new Date().toISOString() });
 });
+
+// Run renewal check every 30 days at 9am UTC
+// Cron: minute hour day month weekday
+// "0 9 */30 * *" = 9:00am every 30 days
+cron.schedule('0 9 */30 * *', async () => {
+  console.log('[CRON] 30-day renewal job triggered at', new Date().toISOString());
+  try {
+    const variantId = await getVariantId();
+    const orders = await getSubscriptionOrders();
+
+    if (!orders.length) {
+      console.log('[CRON] No subscription orders due for renewal');
+      return;
+    }
+
+    for (const order of orders) {
+      const customerId = order.customer?.id;
+      const customerEmail = order.email;
+      if (!customerId) continue;
+
+      const result = await createRenewalOrder(customerId, customerEmail, variantId);
+      if (result.order) {
+        console.log(`[CRON] ✓ Renewed order #${result.order.order_number} for ${customerEmail}`);
+      } else {
+        console.log(`[CRON] ✗ Failed for ${customerEmail}:`, JSON.stringify(result.errors));
+      }
+    }
+  } catch (err) {
+    console.error('[CRON] Error:', err.message);
+  }
+});
+
+console.log('[CRON] Renewal scheduler active - runs every 30 days at 9am UTC');
 
 app.listen(PORT, () => {
   console.log(`[SERVER] Evolari Renewal Server listening on port ${PORT}`);
